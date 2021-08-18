@@ -1,4 +1,4 @@
-import RegistrySampleContract from Project.RegistrySampleContract
+import RegistryVotingContract from Project.RegistrySampleContract
 
 // This is a blank ComposedContract template. It imports
 // the blank RegistrySampleContract template because you will
