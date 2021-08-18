@@ -15,19 +15,17 @@ pub contract RegistryVotingContract: RegistryInterface {
     access(contract) var clientTenants: {Address: UInt64}
 
     pub resource interface ITenant {
-        // @dev {ProposalId: {UserAddress: Vote}}
-        pub var votes: {UInt256: {Address: UInt8}}
-        
-        // both used to keep record of proposals a user has voted on
+
+        // Both used to keep record of proposals a user has voted on
         pub var votersToProposals: {Address: [UInt256]}
         pub var proposalsToVoters: {UInt256: [Address]}
 
-        // record of the description of a proposal to the proposal itself
+        // Record of the description of a proposal to the proposal itself
         pub var proposalsToDescriptions: {UInt256: String}
 
         // @dev proposalToVoteCount keeps track of the vote for each proposal.
         // {proposalId: voteCount}
-        // We add the vote value (1 is for, -1 is against) to the voteCount value for the proposalId
+        // We add the vote value (1 is for, -1 is against) to the voteCount value for the proposalId.
         // Since we know the number of votes (proposalsToVoters[proposalId].length),
         // we can work out how many for and how many against:
         // for = totalVotes - voteCount
