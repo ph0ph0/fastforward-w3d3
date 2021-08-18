@@ -1,7 +1,7 @@
 import RegistryInterface from Project.RegistryInterface
 import RegistryService from Project.RegistryService
 
-pub contract RegistrySampleContract: RegistryInterface {
+pub contract RegistryVotingContract: RegistryInterface {
 
     // Maps an address (of the customer/DappContract) to the amount
     // of tenants they have for a specific RegistryContract.
