@@ -3,12 +3,36 @@ import RegistryService from Project.RegistryService
 
 pub contract RegistryVotingContract: RegistryInterface {
 
-    // Contract that can be used to allow voting
-    // -- Time limit
-    // -- Owner account can close the vote
-    // -- Proposals can be defined by the owner account
-    // -- Pay to vote functionality
-    // -- Initially just binary voting. To keep things simple, 1 is for, -1 is against 
+    // --Overview
+    // This contract that can be would be used to allow voting. There would be two roles
+    // available; a Voter and a Vote Master. The Vote Master would create a proposal,
+    // which has a proposalDescription, a proposalId and a proposalStatus (open, closed). They would also be able
+    // to end voting on a proposal (change status to closed). In a future version, they could specify a timelimit
+    // for the vote, beyond which the contract would automatically close the voting. In the 
+    // 
+    // --Road Blocks
+    // 1) How do I 
+
+    pub struct ProposalStatus {
+        pub case Open
+        pub case Closed
+    }
+
+    pub struct Proposal {
+        pub let proposalId: UInt256
+        pub let ownerAddress: Address
+        pub let proposalDescription: String
+        pub let proposalStatus: ProposalStatus
+        // pub let expiry: UInt256?
+
+        init(_proposalId: UInt256, _ownerAddress: Address _proposalDescription: String, _proposalStatus: ProposalStatus) {
+            self.proposalId = _proposalId
+            self.ownerAddress = _ownerAddress
+            self.proposalDescription = _proposalDescription
+            self.proposalStatus = _proposalStatus
+        }
+
+    }
 
     // Maps an address (of the customer/DappContract) to the amount
     // of tenants they have for a specific RegistryContract.
@@ -110,8 +134,9 @@ pub contract RegistryVotingContract: RegistryInterface {
 
     // @dev allows the vote master to control the voting
     pub resource VoteMaster {
-        pub fun createNewVoteProposal(tenant: &Tenant{ITenant}, proposal: String, duration: UInt256?): UInt256 {
-            // Returns the vote id
+        pub fun createNewVoteProposal(tenant: &Tenant{ITenant}, proposalDescription: String, expiry: UInt256?): UInt256 {
+            // Create a Proposal object
+
         }
         pub fun endVotingOnProposal(tenant: &Tenant{ITenant}, proposalId: proposalId ): Bool {
             // returns success/failure
