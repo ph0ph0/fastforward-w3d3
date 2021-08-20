@@ -6,16 +6,20 @@ pub contract RegistryVotingContract: RegistryInterface {
     // --Overview
     // This contract that can be would be used to allow voting. There would be two roles
     // available; a Voter and a Vote Master. The Vote Master would create a proposal,
-    // which has a proposalDescription, a proposalId and a proposalStatus (open, closed). They would also be able
+    // which has a proposalDescription, a proposalId and a proposalStatus (open, closed). It also has a votePool, 
+    // which are all the addresses that are allowed to vote on the proposal. The Vote Master would also be able
     // to end voting on a proposal (change status to closed). In a future version, they could specify a timelimit
-    // for the vote, beyond which the contract would automatically close the voting. In the 
-    // 
+    // for the vote, beyond which the contract would automatically close the voting. 
+    // A vote for is represented by 1, a vote against is represented by -1.
     // --Road Blocks
-    // 1) How do I 
+    // 1) I haven't used any tokens?
+    // 2) Need to revise access control modifiers
+    // 3) Is my architecture wrong? How do we allocate both Vote Master and Voter resources?
+    // 4) How do we assign a proposalId to the Proposal?
 
     pub struct ProposalStatus {
-        pub case Open
-        pub case Closed
+        pub case isOpen
+        pub case isClosed
     }
 
     pub struct Proposal {
@@ -23,13 +27,27 @@ pub contract RegistryVotingContract: RegistryInterface {
         pub let ownerAddress: Address
         pub let proposalDescription: String
         pub let proposalStatus: ProposalStatus
+        // votePool: Pool of voters allowed to vote
+        pub let votePool: [Address]
+        pub let totalVotes: Int32
+        // voteCount: Sum of all votes. If positive, majority in favour, if negative, majority against.
+        pub let voteSum: Int32
+        // votedOnBy: Addresses that have voted
+        pub let votedOnBy: [Address]
         // pub let expiry: UInt256?
 
-        init(_proposalId: UInt256, _ownerAddress: Address _proposalDescription: String, _proposalStatus: ProposalStatus) {
+
+
+        init(_proposalId: UInt256, _ownerAddress: Address, _proposalDescription: String, _proposalStatus: ProposalStatus, _votePool: [Address]) {
             self.proposalId = _proposalId
             self.ownerAddress = _ownerAddress
             self.proposalDescription = _proposalDescription
-            self.proposalStatus = _proposalStatus
+            self.proposalStatus = ProposalStatus.isOpen
+            self.votePool = _votePool
+            self.totalVotes = 0
+            self.voteSum= 0
+            self.votedOnBy = []
+
         }
 
     }
@@ -38,27 +56,24 @@ pub contract RegistryVotingContract: RegistryInterface {
     // of tenants they have for a specific RegistryContract.
     access(contract) var clientTenants: {Address: UInt64}
 
-    pub resource interface ITenant {
+    pub resource interface ITenantVoter {
 
-        // Both used to keep record of proposals a user has voted on
-        pub var votersToProposals: {Address: [UInt256]}
-        pub var proposalsToVoters: {UInt256: [Address]}
+        access(contract) fun assignVote(for voter: Address, to: , vote: vote): Bool
 
-        // Record of the description of a proposal to the proposal itself
-        pub var proposalsToDescriptions: {UInt256: String}
+    }
 
-        // @dev proposalToVoteCount keeps track of the vote for each proposal.
-        // {proposalId: voteCount}
-        // We add the vote value (1 is for, -1 is against) to the voteCount value for the proposalId.
-        // Since we know the number of votes (proposalsToVoters[proposalId].length),
-        // we can work out how many for and how many against:
-        // for = totalVotes - voteCount
-        // against = |voteCount - totalVotes|
-        pub var proposalToVoteCount: {UInt256: UInt32}
+    pub resource interface ITenantVoteMaster {
 
-        pub var openProposals: [UInt256]
-        pub var closedProposals: [UInt256]
-        access(contract) fun assignVote(for proposal: Proposal, by: Address, vote: vote)
+        pub var allProposals: [Proposal]
+        pub var openProposals: [Proposal]
+        pub var closedProposals: [Proposal]
+
+        access(contract) fun getTotalNoOfProposals(): Int
+        access(contract) fun getAllProposals(): [Proposal]
+        access(contract) fun getOpenProposals(): [Proposal]
+        access(contract) fun getClosedProposals(): [Proposal]
+
+        access(contract) fun getProposal(proposalId: UInt256): Proposal
 
     }
 
@@ -71,19 +86,45 @@ pub contract RegistryVotingContract: RegistryInterface {
     //
     pub resource Tenant {
 
-        // @dev {ProposalId: {UserAddress: Vote}}
-        pub var votes: {UInt256: {Address: UInt8}}
+        pub var openProposals: [Proposal]
+        pub var closedProposals: [Proposal]
 
-        access(contract) fun assignVote(for proposal: UInt256, by: Address, vote: vote): Bool {
-            // Check that the address hasn't for this proposal voted yet
-            // Check that the address of the caller matches the address passed in?
-            // Update the votes dictionary
+        access(contract) fun getTotalNoOfProposals(): Int {
+            let allProposals = openProposals.concat(closedProposals)
+            return allProposals.length
+        }
 
-            // return true if user can vote
+        access(contract) fun getAllProposals(): [Proposal] {
+            return openProposals.concat(closedProposals)
+        }
+
+        access(contract) fun getOpenProposals(): [Proposal] {
+            return openProposals
+        }
+
+        access(contract) fun getClosedProposals(): [Proposal] {
+            return closedProposals
+        }
+
+        access(contract) fun assignVote(for proposalId: UInt256, voterAddress: Address, vote: Int8): Bool {
+            // Update the proposal votes
+            for proposal in openProposals {
+                if proposalId == proposal.proposalId {
+                    // Check that the address hasn't voted for this proposal yet and is allowed to vote on it
+                    if (proposal.votedOnBy.contains(voterAddress) || !proposal.votePool.contains(voterAddress)) {
+                        return false
+                    }
+                    proposal.voteSum  = proposal.voteSum + vote
+                    proposal.votedOnBy.append(voterAddress)
+                    return true
+                }
+            }
+            return false
         }
 
         init() {
-
+            self.openProposals = []
+            self.closedProposals = []
         }
     }
 
@@ -110,7 +151,7 @@ pub contract RegistryVotingContract: RegistryInterface {
 
 
     // @dev allows users to vote on a proposal
-    pub resource VoteEnabler {
+    pub resource VoterResource {
 
         pub fun getOpenProposals(): [String] {
 
@@ -120,7 +161,7 @@ pub contract RegistryVotingContract: RegistryInterface {
 
         }
 
-        pub fun castVote(tenant: &Tenant{ITenant}, proposal: UInt256, vote: UInt8): Bool {
+        pub fun castVote(tenant: &Tenant{ITenant}, proposal: UInt64, vote: UInt8): Bool {
             if (vote != 1 || vote != -1) {
                 return false
             }
@@ -133,7 +174,7 @@ pub contract RegistryVotingContract: RegistryInterface {
     }
 
     // @dev allows the vote master to control the voting
-    pub resource VoteMaster {
+    pub resource VoteMasterResource {
         pub fun createNewVoteProposal(tenant: &Tenant{ITenant}, proposalDescription: String, expiry: UInt256?): UInt256 {
             // Create a Proposal object
 
